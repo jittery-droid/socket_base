@@ -49,7 +49,7 @@ func (c Config) IsProd() bool {
 
 func DefaultConfig() Config {
 	return Config{
-		Port:     3000,
+		Port:     5000,
 		Env:      "dev",
 		Pepper:   "secret-random-string",
 		HMACKey:  "secret-hmac-key",
