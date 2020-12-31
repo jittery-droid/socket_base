@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sockets/context"
 	"sockets/models"
@@ -28,6 +30,7 @@ type LoginForm struct {
 // parsed correctly, and should only be used during
 // initial setup.
 func NewUsers(us models.UserService) *Users {
+	fmt.Println("Creating new users service", us)
 	return &Users{
 		us: us,
 	}
@@ -38,15 +41,9 @@ func NewUsers(us models.UserService) *Users {
 //
 // POST /signup
 func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
-	var form SignupForm
-	if err := parseForm(r, &form); err != nil {
-		panic(err)
-	}
-	user := models.User{
-		Name:     form.Name,
-		Email:    form.Email,
-		Password: form.Password,
-	}
+	var user models.User
+	json.NewDecoder(r.Body).Decode(&user)
+
 	if err := u.us.Create(&user); err != nil {
 		panic(err)
 	}
@@ -55,6 +52,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Login is used to verify the provided email address and
@@ -62,6 +60,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 //
 // POST /login
 func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("In Login")
 	form := LoginForm{}
 	if err := parseForm(r, &form); err != nil {
 		panic(err)

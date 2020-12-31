@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func parseForm(r *http.Request, dst interface{}) error {
+	fmt.Println(r)
 	if err := r.ParseForm(); err != nil {
 		return err
 	}

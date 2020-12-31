@@ -3,16 +3,45 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sockets/controllers"
 	"sockets/middleware"
 	"sockets/models"
-	"sockets/rand"
+	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
+
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+// ServeHTTP serves static js assets
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("In spa handler")
+	path, err := filepath.Abs(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	path = filepath.Join(h.staticPath, path)
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	csrf.TemplateField(r)
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
 
 func main() {
 	boolPtr := flag.Bool("prod", false, "Provide this flag in production. This ensures that a .config file is provided before the application starts.")
@@ -29,12 +58,6 @@ func main() {
 	defer services.Close()
 	services.AutoMigrate()
 
-	r := mux.NewRouter()
-	usersC := controllers.NewUsers(services.User)
-
-	b, err := rand.Bytes(32)
-	must(err)
-	csrfMw := csrf.Protect(b, csrf.Secure(cfg.IsProd()))
 	userMw := middleware.User{
 		UserService: services.User,
 	}
@@ -42,12 +65,25 @@ func main() {
 		User: userMw,
 	}
 
-	r.HandleFunc("/signup", usersC.Create).Methods("POST")
-	r.HandleFunc("/login", usersC.Login).Methods("POST")
-	r.HandleFunc("/logout", requireUserMw.ApplyFn(usersC.Logout)).Methods("POST")
+	r := mux.NewRouter()
+	usersC := controllers.NewUsers(services.User)
+
+	r.HandleFunc("/api/signup", usersC.Create).Methods("POST")
+	r.HandleFunc("/api/login", usersC.Login).Methods("POST")
+	r.HandleFunc("/api/logout", requireUserMw.ApplyFn(usersC.Logout)).Methods("POST")
+
+	spa := spaHandler{staticPath: "client/build", indexPath: "index.html"}
+	r.PathPrefix("/").Handler(spa)
 
 	fmt.Printf("Starting the server on :%d...\n", cfg.Port)
-	http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), csrfMw(userMw.Apply(r)))
+	srv := &http.Server{
+		Handler:      userMw.Apply(r),
+		Addr:         fmt.Sprintf(":%d", cfg.Port),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+	// http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), userMw.Apply(r))
+	log.Fatal(srv.ListenAndServe())
 }
 
 func must(err error) {
