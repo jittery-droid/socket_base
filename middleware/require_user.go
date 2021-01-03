@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sockets/context"
 	"sockets/models"
+	"strconv"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -28,7 +28,7 @@ func (mw *User) extractToken(r *http.Request) string {
 	return ""
 }
 
-func (mw *User) extractUser(tokenString string) {
+func (mw *User) extractUser(tokenString string) uint {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing algo")
@@ -38,12 +38,13 @@ func (mw *User) extractUser(tokenString string) {
 	if err != nil {
 		panic(err)
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		b, err := json.MarshalIndent(claims, "", " ")
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		uid, err := strconv.ParseUint(fmt.Sprintf("%.0f", claims["user_id"]), 10, 32)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(b)
+		return uint(uid)
 	}
 }
 
@@ -57,6 +58,7 @@ func (mw *User) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 		// If the user is requesting a static asset or image
 		// we will not need to lookup the current user so we skip
 		// doing that.
+		// CHANGE TO LOGIN/REGISTER?
 		if strings.HasPrefix(path, "/assets/") ||
 			strings.HasPrefix(path, "/images/") {
 			next(w, r)
@@ -68,13 +70,19 @@ func (mw *User) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		user, err := mw.UserService.ByToken(cookie.Value)
+
 		if err != nil {
 			next(w, r)
 			return
 		}
-		// DISABLE FOR NOW
-		// tokenString := mw.extractToken(r)
-		// mw.extractUser(tokenString)
+
+		tokenString := mw.extractToken(r)
+		userID := mw.extractUser(tokenString)
+
+		if user.ID != userID {
+			next(w, r)
+			return
+		}
 
 		ctx := r.Context()
 		ctx = context.WithUser(ctx, user)

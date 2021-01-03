@@ -26,6 +26,7 @@ const AuthState = (props) => {
 
   const loadUser = useCallback(async () => {
     if (localStorage.token) {
+      console.log('token set: ', localStorage.token);
       setAuthToken(localStorage.token);
     }
     try {
@@ -46,6 +47,7 @@ const AuthState = (props) => {
 
     try {
       const res = await Api.post('/api/signup', formData, config);
+      console.log(res);
       dispatch({
         type: REGISTER_SUCCESS,
         payload: res.data,

@@ -7,6 +7,7 @@ import (
 	"sockets/context"
 	"sockets/models"
 	"sockets/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,11 @@ import (
 
 type Users struct {
 	us models.UserService
+}
+
+type UserResponse struct {
+	Name  string
+	Email string
 }
 
 type SignupForm struct {
@@ -40,8 +46,10 @@ func NewUsers(us models.UserService) *Users {
 
 // Load decodes a JWT token and returns the user
 func (u *Users) Load(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r)
 	// ADD THIS TO MIDDLEWARE
 	tokenString := u.extractToken(r)
+	fmt.Println("tokenString: ", tokenString)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing algo")
@@ -51,12 +59,23 @@ func (u *Users) Load(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		b, err := json.MarshalIndent(claims, "", " ")
+	fmt.Println("token: ", token)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		uid, err := strconv.ParseUint(fmt.Sprintf("%.0f", claims["user_id"]), 10, 32)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(b)
+		user, err := u.us.ByID(uint(uid))
+		if err != nil {
+			panic(err)
+		}
+		payload := UserResponse{
+			Name:  user.Name,
+			Email: user.Email,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
 	}
 }
 

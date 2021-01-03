@@ -40,19 +40,6 @@ const Register = (props) => {
     });
   };
 
-  // const register = (user) => {
-  //   console.log(user);
-  //   Api.post('/api/signup', user)
-  //     .then((response) => {
-  //       response.status === 200
-  //         ? props.history.push('/home')
-  //         : props.history.push('/login');
-  //     })
-  //     .catch((error) => {
-  //       console.log(error);
-  //     });
-  // };
-
   return (
     <div className="form-container">
       <h1>
