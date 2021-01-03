@@ -52,7 +52,7 @@ func main() {
 	services, err := models.NewServices(
 		models.WithGorm(dbCfg.Dialect(), dbCfg.ConnectionInfo()),
 		models.WithLogMode(!cfg.IsProd()),
-		models.WithUser(cfg.Pepper, cfg.HMACKey),
+		models.WithUser(cfg.Pepper, cfg.HMACKey, cfg.JWTSecret),
 	)
 	must(err)
 	defer services.Close()
@@ -68,6 +68,7 @@ func main() {
 	r := mux.NewRouter()
 	usersC := controllers.NewUsers(services.User)
 
+	r.HandleFunc("/api/auth", usersC.Load).Methods("GET")
 	r.HandleFunc("/api/signup", usersC.Create).Methods("POST")
 	r.HandleFunc("/api/login", usersC.Login).Methods("POST")
 	r.HandleFunc("/api/logout", requireUserMw.ApplyFn(usersC.Logout)).Methods("POST")
@@ -82,7 +83,6 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	// http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), userMw.Apply(r))
 	log.Fatal(srv.ListenAndServe())
 }
 

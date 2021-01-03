@@ -30,17 +30,18 @@ func DefaultPostgresConfig() PostgresConfig {
 		Host:     "localhost",
 		Port:     5432,
 		User:     "ian",
-		Password: "coldvein4",
+		Password: "password",
 		Name:     "chat_db",
 	}
 }
 
 type Config struct {
-	Port     int            `json:"port"`
-	Env      string         `json:"env"`
-	Pepper   string         `json:"pepper"`
-	HMACKey  string         `json:"hmac_key"`
-	Database PostgresConfig `json:"database"`
+	Port      int            `json:"port"`
+	Env       string         `json:"env"`
+	Pepper    string         `json:"pepper"`
+	HMACKey   string         `json:"hmac_key"`
+	Database  PostgresConfig `json:"database"`
+	JWTSecret string         `json:"jwt_secret"`
 }
 
 func (c Config) IsProd() bool {
@@ -49,11 +50,12 @@ func (c Config) IsProd() bool {
 
 func DefaultConfig() Config {
 	return Config{
-		Port:     5000,
-		Env:      "dev",
-		Pepper:   "secret-random-string",
-		HMACKey:  "secret-hmac-key",
-		Database: DefaultPostgresConfig(),
+		Port:      5000,
+		Env:       "dev",
+		Pepper:    "secret-random-string",
+		HMACKey:   "secret-hmac-key",
+		JWTSecret: "silly-string",
+		Database:  DefaultPostgresConfig(),
 	}
 }
 

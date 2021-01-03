@@ -7,7 +7,10 @@ import (
 	"sockets/context"
 	"sockets/models"
 	"sockets/rand"
+	"strings"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 type Users struct {
@@ -30,9 +33,30 @@ type LoginForm struct {
 // parsed correctly, and should only be used during
 // initial setup.
 func NewUsers(us models.UserService) *Users {
-	fmt.Println("Creating new users service", us)
 	return &Users{
 		us: us,
+	}
+}
+
+// Load decodes a JWT token and returns the user
+func (u *Users) Load(w http.ResponseWriter, r *http.Request) {
+	// ADD THIS TO MIDDLEWARE
+	tokenString := u.extractToken(r)
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing algo")
+		}
+		return []byte(u.us.JwtSecret()), nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		b, err := json.MarshalIndent(claims, "", " ")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(b)
 	}
 }
 
@@ -47,12 +71,15 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 	if err := u.us.Create(&user); err != nil {
 		panic(err)
 	}
-	err := u.signIn(w, &user)
+	jwtToken, err := u.signIn(w, &user)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(jwtToken)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Login is used to verify the provided email address and
@@ -60,7 +87,6 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 //
 // POST /login
 func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("In Login")
 	form := LoginForm{}
 	if err := parseForm(r, &form); err != nil {
 		panic(err)
@@ -78,14 +104,15 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = u.signIn(w, user)
+	jwtToken, err := u.signIn(w, user)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusUnauthorized)
 		return
 	}
-
-	// http.Redirect(w, r, "/galleries", http.StatusFound)
-	// Home
+	err = json.NewEncoder(w).Encode(jwtToken)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Logout is used to delete a users session cookie (remember_token)
@@ -110,16 +137,16 @@ func (u *Users) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // signIn is used to sign the given user in via cookies
-func (u *Users) signIn(w http.ResponseWriter, user *models.User) error {
+func (u *Users) signIn(w http.ResponseWriter, user *models.User) (string, error) {
 	if user.Remember == "" {
 		token, err := rand.RememberToken()
 		if err != nil {
-			return err
+			return "", err
 		}
 		user.Remember = token
 		err = u.us.Update(user)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -129,5 +156,31 @@ func (u *Users) signIn(w http.ResponseWriter, user *models.User) error {
 		HttpOnly: true,
 	}
 	http.SetCookie(w, &cookie)
-	return nil
+	token, err := u.createToken(user)
+	if err != nil {
+		panic(err)
+	}
+
+	return token, nil
+}
+
+func (u *Users) createToken(user *models.User) (string, error) {
+	claims := jwt.MapClaims{}
+	claims["user_id"] = user.ID
+	claims["exp"] = time.Now().Add(time.Hour * 1).Unix()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(u.us.JwtSecret()))
+}
+
+func (u *Users) extractToken(r *http.Request) string {
+	keys := r.URL.Query()
+	token := keys.Get("token")
+	if token != "" {
+		return token
+	}
+	bearerToken := r.Header.Get("Authorization")
+	if len(strings.Split(bearerToken, " ")) == 2 {
+		return strings.Split(bearerToken, " ")[1]
+	}
+	return ""
 }

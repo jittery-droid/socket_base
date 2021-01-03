@@ -30,9 +30,9 @@ func WithLogMode(mode bool) ServicesConfig {
 	}
 }
 
-func WithUser(pepper, hmacKey string) ServicesConfig {
+func WithUser(pepper, hmacKey, jwtSecret string) ServicesConfig {
 	return func(s *Services) error {
-		s.User = NewUserService(s.db, pepper, hmacKey)
+		s.User = NewUserService(s.db, pepper, hmacKey, jwtSecret)
 		return nil
 	}
 }

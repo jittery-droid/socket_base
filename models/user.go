@@ -24,6 +24,7 @@ type User struct {
 
 type UserService interface {
 	Authenticate(email, password string) (*User, error)
+	JwtSecret() string
 	UserDB
 }
 
@@ -45,23 +46,30 @@ type userValidator struct {
 	hmac       hash.HMAC
 	emailRegex *regexp.Regexp
 	pepper     string
+	jwtSecret  string
 }
 
 type userService struct {
 	UserDB
-	pepper string
+	pepper    string
+	jwtSecret string
 }
 
 type userValFunc func(*User) error
 
-func NewUserService(db *gorm.DB, pepper, hmacKey string) UserService {
+func NewUserService(db *gorm.DB, pepper, hmacKey, jwtSecret string) UserService {
 	ud := &userDbHandle{db}
 	hmac := hash.NewHMAC(hmacKey)
-	uv := newUserValidationLayer(ud, hmac, pepper)
+	uv := newUserValidationLayer(ud, hmac, pepper, jwtSecret)
 	return &userService{
-		UserDB: uv,
-		pepper: pepper,
+		UserDB:    uv,
+		pepper:    pepper,
+		jwtSecret: jwtSecret,
 	}
+}
+
+func (us *userService) JwtSecret() string {
+	return us.jwtSecret
 }
 
 func (us *userService) Authenticate(email, password string) (*User, error) {
@@ -291,11 +299,12 @@ func (uv *userValidator) passwordHashRequired(user *User) error {
 	return nil
 }
 
-func newUserValidationLayer(udb UserDB, hmac hash.HMAC, pepper string) *userValidator {
+func newUserValidationLayer(udb UserDB, hmac hash.HMAC, pepper, jwtSecret string) *userValidator {
 	return &userValidator{
-		UserDB: udb,
-		hmac:   hmac,
-		pepper: pepper,
+		UserDB:    udb,
+		hmac:      hmac,
+		jwtSecret: jwtSecret,
+		pepper:    pepper,
 		emailRegex: regexp.MustCompile(
 			`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
 	}
