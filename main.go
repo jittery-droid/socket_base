@@ -24,6 +24,10 @@ type spaHandler struct {
 
 // ServeHTTP serves static js assets
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Allow-Headers",
+		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	fmt.Println("In spa handler")
 	path, err := filepath.Abs(r.URL.Path)
 	if err != nil {

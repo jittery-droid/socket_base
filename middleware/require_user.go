@@ -46,6 +46,7 @@ func (mw *User) extractUser(tokenString string) uint {
 		}
 		return uint(uid)
 	}
+	return 0
 }
 
 func (mw *User) Apply(next http.Handler) http.HandlerFunc {
@@ -54,6 +55,10 @@ func (mw *User) Apply(next http.Handler) http.HandlerFunc {
 
 func (mw *User) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers",
+			"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 		path := r.URL.Path
 		// If the user is requesting a static asset or image
 		// we will not need to lookup the current user so we skip
