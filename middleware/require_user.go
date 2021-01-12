@@ -17,11 +17,13 @@ type User struct {
 
 func (mw *User) extractToken(r *http.Request) string {
 	keys := r.URL.Query()
+	fmt.Println("keys:", keys)
 	token := keys.Get("token")
 	if token != "" {
 		return token
 	}
 	bearerToken := r.Header.Get("Authorization")
+	fmt.Println(bearerToken)
 	if len(strings.Split(bearerToken, " ")) == 2 {
 		return strings.Split(bearerToken, " ")[1]
 	}
@@ -29,6 +31,7 @@ func (mw *User) extractToken(r *http.Request) string {
 }
 
 func (mw *User) extractUser(tokenString string) uint {
+	fmt.Println("tokenString", tokenString)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing algo")
@@ -57,34 +60,29 @@ func (mw *User) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-		path := r.URL.Path
-		// If the user is requesting a static asset or image
-		// we will not need to lookup the current user so we skip
-		// doing that.
-		// CHANGE TO LOGIN/REGISTER?
-		if strings.HasPrefix(path, "/assets/") ||
-			strings.HasPrefix(path, "/images/") {
-			next(w, r)
-			return
-		}
-		cookie, err := r.Cookie("remember_token")
-		if err != nil {
-			next(w, r)
-			return
-		}
-		user, err := mw.UserService.ByToken(cookie.Value)
 
-		if err != nil {
+		if r.Method == "OPTIONS" {
+			next(w, r)
+			return
+		}
+
+		path := r.URL.Path
+
+		if strings.HasPrefix(path, "/api/login") ||
+			strings.HasPrefix(path, "/api/register") ||
+			strings.HasPrefix(path, "/api/auth") ||
+			strings.HasPrefix(path, "/") {
 			next(w, r)
 			return
 		}
 
 		tokenString := mw.extractToken(r)
 		userID := mw.extractUser(tokenString)
-
-		if user.ID != userID {
+		user, err := mw.UserService.ByID(userID)
+		if err != nil {
 			next(w, r)
 			return
 		}

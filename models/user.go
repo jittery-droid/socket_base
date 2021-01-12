@@ -2,15 +2,11 @@ package models
 
 import (
 	"regexp"
-	"sockets/hash"
-	"sockets/rand"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
 )
-
-const hmacSecretKey = "secret-hmac-key"
 
 type User struct {
 	gorm.Model
@@ -18,8 +14,6 @@ type User struct {
 	Email        string `gorm:"not null; unique_index"`
 	Password     string `gorm:"-"`
 	PasswordHash string `gorm:"not null"`
-	Remember     string `gorm:"-"`
-	RememberHash string `gorm:"not null; unique_index"`
 }
 
 type UserService interface {
@@ -31,7 +25,6 @@ type UserService interface {
 type UserDB interface {
 	ByID(id uint) (*User, error)
 	ByEmail(email string) (*User, error)
-	ByToken(token string) (*User, error)
 	Create(user *User) error
 	Update(user *User) error
 	Delete(id uint) error
@@ -43,7 +36,6 @@ type userDbHandle struct {
 
 type userValidator struct {
 	UserDB
-	hmac       hash.HMAC
 	emailRegex *regexp.Regexp
 	pepper     string
 	jwtSecret  string
@@ -57,10 +49,9 @@ type userService struct {
 
 type userValFunc func(*User) error
 
-func NewUserService(db *gorm.DB, pepper, hmacKey, jwtSecret string) UserService {
+func NewUserService(db *gorm.DB, pepper, jwtSecret string) UserService {
 	ud := &userDbHandle{db}
-	hmac := hash.NewHMAC(hmacKey)
-	uv := newUserValidationLayer(ud, hmac, pepper, jwtSecret)
+	uv := newUserValidationLayer(ud, pepper, jwtSecret)
 	return &userService{
 		UserDB:    uv,
 		pepper:    pepper,
@@ -103,18 +94,6 @@ func (uv *userValidator) ByEmail(email string) (*User, error) {
 	return uv.UserDB.ByEmail(user.Email)
 }
 
-// ByRemember will hash the remember token and then call
-// ByRemember on the subsequent UserDB layer.
-func (uv *userValidator) ByRemember(token string) (*User, error) {
-	user := User{
-		Remember: token,
-	}
-	if err := runUserValFuncs(&user, uv.hmacRemember); err != nil {
-		return nil, err
-	}
-	return uv.UserDB.ByToken(user.RememberHash)
-}
-
 // Create will create the provided user and backfill data
 // like the ID, CreatedAt, and UpdatedAt fields.
 func (uv *userValidator) Create(user *User) error {
@@ -123,10 +102,6 @@ func (uv *userValidator) Create(user *User) error {
 		uv.passwordMinLength,
 		uv.bcryptPassword,
 		uv.passwordHashRequired,
-		uv.setRememberIfUnset,
-		uv.rememberMinBytes,
-		uv.hmacRemember,
-		uv.rememberHashRequired,
 		uv.normalizeEmail,
 		uv.requireEmail,
 		uv.emailFormat,
@@ -143,9 +118,6 @@ func (uv *userValidator) Update(user *User) error {
 		uv.passwordMinLength,
 		uv.bcryptPassword,
 		uv.passwordHashRequired,
-		uv.rememberMinBytes,
-		uv.hmacRemember,
-		uv.rememberHashRequired,
 		uv.normalizeEmail,
 		uv.requireEmail,
 		uv.emailFormat,
@@ -181,47 +153,6 @@ func (uv *userValidator) bcryptPassword(user *User) error {
 	}
 	user.PasswordHash = string(hashedBytes)
 	user.Password = ""
-	return nil
-}
-
-func (uv *userValidator) hmacRemember(user *User) error {
-	if user.Remember == "" {
-		return nil
-	}
-	user.RememberHash = uv.hmac.Hash(user.Remember)
-	return nil
-}
-
-func (uv *userValidator) setRememberIfUnset(user *User) error {
-	if user.Remember != "" {
-		return nil
-	}
-	token, err := rand.RememberToken()
-	if err != nil {
-		return err
-	}
-	user.Remember = token
-	return nil
-}
-
-func (uv *userValidator) rememberMinBytes(user *User) error {
-	if user.Remember == "" {
-		return nil
-	}
-	n, err := rand.NBytes(user.Remember)
-	if err != nil {
-		return err
-	}
-	if n < 32 {
-		return ErrRememberTooShort
-	}
-	return nil
-}
-
-func (uv *userValidator) rememberHashRequired(user *User) error {
-	if user.RememberHash == "" {
-		return ErrRememberRequired
-	}
 	return nil
 }
 
@@ -299,10 +230,9 @@ func (uv *userValidator) passwordHashRequired(user *User) error {
 	return nil
 }
 
-func newUserValidationLayer(udb UserDB, hmac hash.HMAC, pepper, jwtSecret string) *userValidator {
+func newUserValidationLayer(udb UserDB, pepper, jwtSecret string) *userValidator {
 	return &userValidator{
 		UserDB:    udb,
-		hmac:      hmac,
 		jwtSecret: jwtSecret,
 		pepper:    pepper,
 		emailRegex: regexp.MustCompile(
@@ -350,19 +280,6 @@ func (ug *userDbHandle) ByEmail(email string) (*User, error) {
 	db := ug.db.Where("email = ?", email)
 	err := first(db, &user)
 	return &user, err
-}
-
-// ByToken looks up a user with the given remember token
-// and returns that user. This method expects the remember
-// token to already be hashed.
-// Errors are the same as ByEmail.
-func (ug *userDbHandle) ByToken(rememberHash string) (*User, error) {
-	var user User
-	err := first(ug.db.Where("remember_hash = ?", rememberHash), &user)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
 }
 
 // Create will create the provided user and backfill data

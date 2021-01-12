@@ -7,7 +7,8 @@ import (
 type ServicesConfig func(*Services) error
 
 type Services struct {
-	User UserService
+	User   UserService
+	Friend FriendService
 	// Socket SocketService
 	db *gorm.DB
 }
@@ -30,9 +31,16 @@ func WithLogMode(mode bool) ServicesConfig {
 	}
 }
 
-func WithUser(pepper, hmacKey, jwtSecret string) ServicesConfig {
+func WithUser(pepper, jwtSecret string) ServicesConfig {
 	return func(s *Services) error {
-		s.User = NewUserService(s.db, pepper, hmacKey, jwtSecret)
+		s.User = NewUserService(s.db, pepper, jwtSecret)
+		return nil
+	}
+}
+
+func WithFriend() ServicesConfig {
+	return func(s *Services) error {
+		s.Friend = NewFriendService(s.db)
 		return nil
 	}
 }
@@ -62,5 +70,5 @@ func (s *Services) DestructiveReset() error {
 }
 
 func (s *Services) AutoMigrate() error {
-	return s.db.AutoMigrate(&User{}).Error
+	return s.db.AutoMigrate(&User{}, &Friend{}).Error
 }

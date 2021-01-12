@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sockets/context"
 	"sockets/models"
-	"sockets/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -46,8 +44,6 @@ func NewUsers(us models.UserService) *Users {
 
 // Load decodes a JWT token and returns the user
 func (u *Users) Load(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r)
-	// ADD THIS TO MIDDLEWARE
 	tokenString := u.extractToken(r)
 	fmt.Println("tokenString: ", tokenString)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -106,12 +102,12 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 //
 // POST /login
 func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
-	form := LoginForm{}
-	if err := parseForm(r, &form); err != nil {
-		panic(err)
-	}
+	fmt.Println("login", r)
+	var login models.User
+	json.NewDecoder(r.Body).Decode(&login)
+	fmt.Println("login", r)
 
-	user, err := u.us.Authenticate(form.Email, form.Password)
+	user, err := u.us.Authenticate(login.Email, login.Password)
 	if err != nil {
 		switch err {
 		case models.ErrNotFound:
@@ -140,41 +136,12 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 //
 // POST /logout
 func (u *Users) Logout(w http.ResponseWriter, r *http.Request) {
-	cookie := http.Cookie{
-		Name:     "remember_token",
-		Value:    "",
-		Expires:  time.Now(),
-		HttpOnly: true,
-	}
-	http.SetCookie(w, &cookie)
-
-	user := context.User(r.Context())
-	token, _ := rand.RememberToken()
-	user.Remember = token
-	u.us.Update(user)
+	// kill jwt token
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // signIn is used to sign the given user in via cookies
 func (u *Users) signIn(w http.ResponseWriter, user *models.User) (string, error) {
-	if user.Remember == "" {
-		token, err := rand.RememberToken()
-		if err != nil {
-			return "", err
-		}
-		user.Remember = token
-		err = u.us.Update(user)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	cookie := http.Cookie{
-		Name:     "remember_token",
-		Value:    user.Remember,
-		HttpOnly: true,
-	}
-	http.SetCookie(w, &cookie)
 	token, err := u.createToken(user)
 	if err != nil {
 		panic(err)

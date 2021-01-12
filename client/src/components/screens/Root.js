@@ -3,7 +3,11 @@ import React from 'react';
 const Root = (props) => {
   console.log(props);
 
-  return <>Root Page</>;
+  return (
+    <>
+      <b>Hello little cabbage ;)</b>
+    </>
+  );
 };
 
 export default Root;

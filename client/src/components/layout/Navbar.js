@@ -1,18 +1,20 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useContext } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import AuthContext from '../../context/auth/authContext';
 
 const Navbar = ({ title, icon }) => {
-  // check for remember token
-  let isAuthenticated = false;
-  const onLogout = () => {};
+  const authContext = useContext(AuthContext);
 
+  const { isAuthenticated, logout, user } = authContext;
+  const onLogout = () => {
+    logout();
+  };
+  console.log(isAuthenticated);
+  console.log(user);
   const authLinks = (
     <Fragment>
-      <li>
-        Hello
-        {/* name if authenticated */}
-      </li>
+      <li>Hello {user && user.Name}</li>
       <li>
         <a onClick={onLogout} href="#!">
           <i className="fas fa-sign-out-alt"></i>
@@ -49,7 +51,6 @@ Navbar.propTypes = {
 };
 
 Navbar.defaultProps = {
-  title: 'Welcome',
   icon: 'fas fa-id-card-alt',
 };
 

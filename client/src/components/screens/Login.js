@@ -5,16 +5,20 @@ const Login = (props) => {
   const authContext = useContext(AuthContext);
   const { login, error, clearErrors, isAuthenticated } = authContext;
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      props.history.push('/home');
-    }
+  useEffect(
+    () => {
+      if (isAuthenticated) {
+        props.history.push('/home');
+      }
 
-    if (error === 'Invalid Credentials') {
-      console.log(error);
-      clearErrors();
-    }
-  }, [error, isAuthenticated, props.history]);
+      if (error === 'Invalid Credentials') {
+        console.log(error);
+        clearErrors();
+      }
+    },
+    // eslint-disable-next-line
+    [error, isAuthenticated, props.history]
+  );
 
   const [user, setUser] = useState({
     email: '',
@@ -37,18 +41,6 @@ const Login = (props) => {
       login({ email, password });
     }
   };
-
-  // const login = (user) => {
-  //   Api.post('/login', user)
-  //     .then((response) => {
-  //       response.status === 200
-  //         ? props.history.push('/home')
-  //         : props.history.push('/login');
-  //     })
-  //     .catch((error) => {
-  //       console.log(error);
-  //     });
-  // };
 
   return (
     <div className="form-container">

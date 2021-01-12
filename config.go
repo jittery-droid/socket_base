@@ -39,7 +39,6 @@ type Config struct {
 	Port      int            `json:"port"`
 	Env       string         `json:"env"`
 	Pepper    string         `json:"pepper"`
-	HMACKey   string         `json:"hmac_key"`
 	Database  PostgresConfig `json:"database"`
 	JWTSecret string         `json:"jwt_secret"`
 }
@@ -53,7 +52,6 @@ func DefaultConfig() Config {
 		Port:      5000,
 		Env:       "dev",
 		Pepper:    "secret-random-string",
-		HMACKey:   "secret-hmac-key",
 		JWTSecret: "silly-string",
 		Database:  DefaultPostgresConfig(),
 	}

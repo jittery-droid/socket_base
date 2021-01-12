@@ -5,16 +5,20 @@ const Register = (props) => {
   const authContext = useContext(AuthContext);
   const { register, error, clearErrors, isAuthenticated } = authContext;
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      props.history.push('/home');
-    }
+  useEffect(
+    () => {
+      if (isAuthenticated) {
+        props.history.push('/home');
+      }
 
-    if (error === 'User already exists') {
-      console.log(error);
-      clearErrors();
-    }
-  }, [error, isAuthenticated, props.history]);
+      if (error === 'User already exists') {
+        console.log(error);
+        clearErrors();
+      }
+    },
+    // eslint-disable-next-line
+    [error, isAuthenticated, props.history]
+  );
 
   const [user, setUser] = useState({
     name: '',

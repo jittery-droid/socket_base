@@ -24,11 +24,12 @@ type spaHandler struct {
 
 // ServeHTTP serves static js assets
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5000")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers",
 		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-	fmt.Println("In spa handler")
 	path, err := filepath.Abs(r.URL.Path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -56,7 +57,8 @@ func main() {
 	services, err := models.NewServices(
 		models.WithGorm(dbCfg.Dialect(), dbCfg.ConnectionInfo()),
 		models.WithLogMode(!cfg.IsProd()),
-		models.WithUser(cfg.Pepper, cfg.HMACKey, cfg.JWTSecret),
+		models.WithUser(cfg.Pepper, cfg.JWTSecret),
+		models.WithFriend(),
 	)
 	must(err)
 	defer services.Close()
@@ -71,11 +73,14 @@ func main() {
 
 	r := mux.NewRouter()
 	usersC := controllers.NewUsers(services.User)
+	friendsC := controllers.NewFriends(services.Friend, r)
 
 	r.HandleFunc("/api/auth", usersC.Load).Methods("GET")
 	r.HandleFunc("/api/signup", usersC.Create).Methods("POST")
 	r.HandleFunc("/api/login", usersC.Login).Methods("POST")
 	r.HandleFunc("/api/logout", requireUserMw.ApplyFn(usersC.Logout)).Methods("POST")
+	r.HandleFunc("/api/friends", friendsC.Index).Methods("GET")
+	r.HandleFunc("/api/friends", friendsC.Create).Methods("POST")
 
 	spa := spaHandler{staticPath: "client/build", indexPath: "index.html"}
 	r.PathPrefix("/").Handler(spa)
