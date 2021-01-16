@@ -73,8 +73,7 @@ func (mw *User) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 
 		if strings.HasPrefix(path, "/api/login") ||
 			strings.HasPrefix(path, "/api/register") ||
-			strings.HasPrefix(path, "/api/auth") ||
-			strings.HasPrefix(path, "/") {
+			strings.HasPrefix(path, "/api/auth") {
 			next(w, r)
 			return
 		}

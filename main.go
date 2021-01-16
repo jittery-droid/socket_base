@@ -12,6 +12,8 @@ import (
 	"sockets/models"
 	"time"
 
+	"github.com/gorilla/handlers"
+
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
@@ -24,12 +26,6 @@ type spaHandler struct {
 
 // ServeHTTP serves static js assets
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-	// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5000")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	w.Header().Set("Access-Control-Allow-Headers",
-		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	path, err := filepath.Abs(r.URL.Path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -86,8 +82,15 @@ func main() {
 	r.PathPrefix("/").Handler(spa)
 
 	fmt.Printf("Starting the server on :%d...\n", cfg.Port)
+
+	headersOk := handlers.AllowedHeaders([]string{"Accept", "Content-Type", "Content-Length", "Accept-Encoding", "Authorization"})
+	originsOk := handlers.AllowedOrigins([]string{"http://localhost:3000", "http://localhost:5000"})
+	methodsOk := handlers.AllowedMethods([]string{"POST", "GET", "OPTIONS", "PUT", "DELETE"})
+	credentialsOk := handlers.AllowCredentials()
+	corsHandler := handlers.CORS(originsOk, headersOk, methodsOk, credentialsOk)(userMw.Apply(r))
+
 	srv := &http.Server{
-		Handler:      userMw.Apply(r),
+		Handler:      corsHandler,
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
